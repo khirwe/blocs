@@ -1,7 +1,6 @@
 // ── CONFIG ──────────────────────────────────────────────────────
 const CONTRACT_ADDRESS = "0x0A8Ac86a38833b66A01702d414118FEf1ee65dAe";
 const RPC_URL = "https://testnet-rpc.monad.xyz";
-const CHAIN_ID = 10143;
 const TOTAL_CITIES = 30;
 const ROUND_TIMER = 7;
 const FINAL_ROUND_TIMER = 5;
@@ -35,15 +34,74 @@ const COLORS = [
   "#9333ea","#db2777","#65a30d","#0284c7","#7c3aed"
 ];
 
-const REGION_MAP = {
-  NA: { label: "North America", cityStart: 0 },
-  SA: { label: "South America", cityStart: 5 },
-  EU: { label: "Europe",        cityStart: 10 },
-  AF: { label: "Africa",        cityStart: 15 },
-  AS: { label: "Asia",          cityStart: 20 },
-  OC: { label: "Oceania",       cityStart: 25 }
+// ── COUNTRY → CITY MAPPING ───────────────────────────────────────
+// 195 countries mapped to 30 cities (6 regions x 5 cities)
+// Region 0: North America (cities 0-4)
+// Region 1: South America (cities 5-9)
+// Region 2: Europe (cities 10-14)
+// Region 3: Africa (cities 15-19)
+// Region 4: Asia (cities 20-24)
+// Region 5: Oceania (cities 25-29)
+
+const COUNTRY_TO_CITY = {
+  // North America (0-4)
+  "us": 0, "ca": 1, "mx": 2, "gt": 3, "bz": 3, "hn": 3,
+  "sv": 3, "ni": 3, "cr": 3, "pa": 3, "cu": 4, "jm": 4,
+  "ht": 4, "do": 4, "pr": 4, "tt": 4, "bs": 4, "bb": 4,
+  "lc": 4, "vc": 4, "gd": 4, "ag": 4, "dm": 4, "kn": 4,
+  "gl": 1, "pm": 1,
+
+  // South America (5-9)
+  "br": 5, "ar": 6, "co": 7, "ve": 7, "pe": 8, "cl": 8,
+  "ec": 8, "bo": 8, "py": 9, "uy": 9, "gy": 9, "sr": 9,
+  "gf": 9, "fk": 9,
+
+  // Europe (10-14)
+  "de": 10, "fr": 10, "gb": 11, "it": 11, "es": 12,
+  "pt": 12, "nl": 12, "be": 12, "ch": 12, "at": 12,
+  "pl": 13, "cz": 13, "sk": 13, "hu": 13, "ro": 13,
+  "bg": 13, "rs": 13, "hr": 13, "si": 13, "ba": 13,
+  "me": 13, "mk": 13, "al": 13, "gr": 13, "cy": 13,
+  "se": 11, "no": 11, "dk": 11, "fi": 11, "is": 11,
+  "ie": 11, "lu": 12, "li": 12, "mc": 12, "ad": 12,
+  "sm": 12, "va": 12, "mt": 12, "ee": 13, "lv": 13,
+  "lt": 13, "by": 13, "ua": 13, "md": 13, "ru": 14,
+  "tr": 14, "ge": 14, "am": 14, "az": 14,
+
+  // Africa (15-19)
+  "ng": 15, "et": 15, "eg": 16, "cd": 15, "tz": 17,
+  "ke": 17, "za": 18, "ug": 17, "dz": 16, "sd": 16,
+  "ma": 16, "ao": 18, "mz": 18, "gh": 15, "mg": 19,
+  "cm": 15, "ci": 15, "ne": 16, "bf": 15, "ml": 16,
+  "mw": 18, "zm": 18, "sn": 15, "so": 17, "td": 16,
+  "gn": 15, "rw": 17, "bj": 15, "tn": 16, "bi": 17,
+  "ss": 16, "tg": 15, "sl": 15, "ly": 16, "cg": 15,
+  "lr": 15, "cf": 15, "mr": 16, "er": 17, "gm": 15,
+  "bw": 18, "na": 18, "ga": 15, "ls": 18, "gq": 15,
+  "gw": 15, "mu": 19, "sz": 18, "dj": 17, "km": 19,
+  "cv": 15, "st": 15, "sc": 19, "eh": 16,
+
+  // Asia (20-24)
+  "cn": 20, "in": 21, "id": 22, "pk": 21, "bd": 21,
+  "jp": 20, "ph": 22, "vn": 22, "ir": 23, "th": 22,
+  "mm": 22, "kr": 20, "iq": 23, "af": 23, "sa": 23,
+  "uz": 24, "my": 22, "ye": 23, "np": 21, "kp": 20,
+  "tw": 20, "sy": 23, "lk": 21, "kz": 24, "kh": 22,
+  "jo": 23, "az": 24, "ae": 23, "tj": 24, "la": 22,
+  "il": 23, "lb": 23, "kg": 24, "tm": 24, "sg": 22,
+  "om": 23, "ps": 23, "kw": 23, "ge": 24, "mn": 20,
+  "qa": 23, "bh": 23, "tl": 22, "bn": 22, "bt": 21,
+  "mv": 21, "am": 24, "mo": 20, "hk": 20,
+
+  // Oceania (25-29)
+  "au": 25, "pg": 26, "nz": 27, "fj": 28, "sb": 26,
+  "vu": 28, "ws": 28, "ki": 28, "to": 28, "fm": 26,
+  "pw": 26, "mh": 28, "nr": 28, "tv": 28, "ck": 29,
+  "nu": 29, "wf": 28, "as": 28, "pf": 29, "nc": 26,
+  "gu": 26, "mp": 26,
 };
 
+// ── STATE ────────────────────────────────────────────────────────
 let provider, signer, contract, burnerWallet;
 let isHost = false;
 let isPlayer = false;
@@ -53,15 +111,16 @@ let timerInterval = null;
 let pollInterval = null;
 let moveSubmitted = false;
 let selectedCityIdx = 0;
+let selectedCountryName = "None";
+let cityOwnerCache = {};
 
 // ── INIT ─────────────────────────────────────────────────────────
-window.addEventListener("load", () => {
-  detectRole();
-});
+window.addEventListener("load", () => detectRole());
 
-function detectRole() {
+async function detectRole() {
   const params = new URLSearchParams(window.location.search);
   const role = params.get("role");
+
   if (role === "host") {
     isHost = true;
     showScreen("lobby-screen");
@@ -76,8 +135,8 @@ function detectRole() {
 // ── FUND BURNER ───────────────────────────────────────────────────
 async function fundBurnerIfNeeded(address) {
   try {
-    document.getElementById("join-status") &&
-      (document.getElementById("join-status").textContent = "Funding wallet...");
+    const statusEl = document.getElementById("join-status");
+    if (statusEl) statusEl.textContent = "Funding wallet...";
     const res = await fetch(`/api/fund?address=${address}`);
     const data = await res.json();
     console.log("Fund result:", data);
@@ -102,6 +161,16 @@ async function setupHost() {
   contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
 
   await fundBurnerIfNeeded(burnerWallet.address);
+
+  // Check if game already active — skip to game screen
+  const phase = Number(await contract.getPhase());
+  if (phase === 1) {
+    clearInterval(pollInterval);
+    showScreen("game-screen");
+    await buildMap();
+    startHostGameLoop();
+    return;
+  }
 
   const joinURL = window.location.origin + window.location.pathname;
   new QRCode(document.getElementById("qr-container"), {
@@ -131,7 +200,7 @@ async function startGame() {
     await tx.wait();
     clearInterval(pollInterval);
     showScreen("game-screen");
-    buildMap();
+    await buildMap();
     startHostGameLoop();
   } catch (e) {
     console.error(e);
@@ -143,7 +212,8 @@ async function startGame() {
 
 // ── PLAYER SETUP ─────────────────────────────────────────────────
 async function setupPlayer() {
-  document.getElementById("join-status").textContent = "Setting up wallet...";
+  const statusEl = document.getElementById("join-status");
+  statusEl.textContent = "Setting up wallet...";
 
   let privateKey = new URLSearchParams(window.location.search).get("pk");
   if (!privateKey) privateKey = localStorage.getItem("blocs_burner_pk");
@@ -160,7 +230,28 @@ async function setupPlayer() {
 
   await fundBurnerIfNeeded(burnerWallet.address);
 
-  document.getElementById("join-status").textContent = "Joining game...";
+  // Check if game already active — skip join
+  const phase = Number(await contract.getPhase());
+  if (phase === 1) {
+    statusEl.textContent = "Game in progress — joining...";
+    try {
+      const playerData = await contract.players(burnerWallet.address);
+      if (!playerData.registered) {
+        statusEl.textContent = "❌ Game already started. Wait for next round.";
+        return;
+      }
+      myCity = await getPlayerCity(burnerWallet.address);
+      showScreen("game-screen");
+      await buildMap();
+      document.getElementById("action-panel").style.display = "flex";
+      startPlayerGameLoop();
+      return;
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  statusEl.textContent = "Joining game...";
 
   try {
     const playerData = await contract.players(burnerWallet.address);
@@ -170,15 +261,14 @@ async function setupPlayer() {
     }
 
     myCity = await getPlayerCity(burnerWallet.address);
-    document.getElementById("join-status").textContent = "✅ Joined!";
+    statusEl.textContent = "✅ Joined! Waiting for host to start...";
     document.getElementById("player-city-display").textContent =
       myCity !== null ? `Your starting city: #${myCity + 1}` : "";
 
     pollInterval = setInterval(checkGameStart, 2000);
   } catch (e) {
     console.error(e);
-    document.getElementById("join-status").textContent =
-      "❌ Failed to join. Make sure game is in lobby.";
+    statusEl.textContent = "❌ Failed to join. Make sure game is in lobby.";
   }
 }
 
@@ -196,8 +286,7 @@ async function checkGameStart() {
     if (phase === 1) {
       clearInterval(pollInterval);
       showScreen("game-screen");
-      buildMap();
-      buildRegionSelect();
+      await buildMap();
       document.getElementById("action-panel").style.display = "flex";
       startPlayerGameLoop();
     }
@@ -205,89 +294,118 @@ async function checkGameStart() {
 }
 
 // ── MAP ───────────────────────────────────────────────────────────
-function buildMap() {
+async function buildMap() {
   const grid = document.getElementById("city-grid");
-  grid.innerHTML = `
-  <svg id="world-svg" viewBox="0 0 1000 500"
-    style="width:100%;height:auto;background:#0d1117;border-radius:12px;">
+  grid.innerHTML = `<p style="color:#666;text-align:center;padding:20px;">Loading map...</p>`;
 
-    <!-- North America -->
-    <path id="region-NA"
-      d="M80,80 L200,60 L240,100 L220,180 L180,220 L120,200 L80,160 Z"
-      fill="#1a1a2e" stroke="#444" stroke-width="1.5" class="region"
-      onclick="selectRegion('NA')"/>
-    <text x="155" y="145" fill="#666" font-size="12"
-      text-anchor="middle" pointer-events="none">N.AMERICA</text>
+  try {
+    const res = await fetch(
+      "https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson"
+    );
+    const geojson = await res.json();
 
-    <!-- South America -->
-    <path id="region-SA"
-      d="M160,240 L220,230 L245,300 L225,385 L185,405 L145,365 L132,292 Z"
-      fill="#1a1a2e" stroke="#444" stroke-width="1.5" class="region"
-      onclick="selectRegion('SA')"/>
-    <text x="188" y="322" fill="#666" font-size="12"
-      text-anchor="middle" pointer-events="none">S.AMERICA</text>
+    // Build SVG using simple projection
+    const svgNS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(svgNS, "svg");
+    svg.setAttribute("viewBox", "0 0 1000 500");
+    svg.setAttribute("id", "world-svg");
+    svg.style.width = "100%";
+    svg.style.height = "auto";
+    svg.style.background = "#0d1117";
+    svg.style.borderRadius = "12px";
+    svg.style.cursor = "pointer";
 
-    <!-- Europe -->
-    <path id="region-EU"
-      d="M415,55 L505,45 L525,105 L505,145 L440,155 L408,112 Z"
-      fill="#1a1a2e" stroke="#444" stroke-width="1.5" class="region"
-      onclick="selectRegion('EU')"/>
-    <text x="466" y="105" fill="#666" font-size="12"
-      text-anchor="middle" pointer-events="none">EUROPE</text>
+    geojson.features.forEach(feature => {
+      const code = feature.properties.iso_a2?.toLowerCase();
+      if (!code) return;
 
-    <!-- Africa -->
-    <path id="region-AF"
-      d="M415,172 L502,162 L524,224 L514,325 L462,362 L408,324 L398,242 Z"
-      fill="#1a1a2e" stroke="#444" stroke-width="1.5" class="region"
-      onclick="selectRegion('AF')"/>
-    <text x="460" y="268" fill="#666" font-size="12"
-      text-anchor="middle" pointer-events="none">AFRICA</text>
+      const cityIdx = COUNTRY_TO_CITY[code];
+      const paths = geoToPaths(feature.geometry);
 
-    <!-- Asia -->
-    <path id="region-AS"
-      d="M542,48 L782,38 L804,122 L762,184 L682,202 L582,182 L532,132 Z"
-      fill="#1a1a2e" stroke="#444" stroke-width="1.5" class="region"
-      onclick="selectRegion('AS')"/>
-    <text x="660" y="122" fill="#666" font-size="12"
-      text-anchor="middle" pointer-events="none">ASIA</text>
+      paths.forEach(d => {
+        if (!d) return;
+        const path = document.createElementNS(svgNS, "path");
+        path.setAttribute("d", d);
+        path.setAttribute("fill", "#1a1a2e");
+        path.setAttribute("stroke", "#2a2a4a");
+        path.setAttribute("stroke-width", "0.5");
+        path.setAttribute("id", `country-${code}`);
+        path.setAttribute("data-code", code);
+        path.setAttribute("data-city", cityIdx ?? -1);
+        path.setAttribute("data-name", feature.properties.name ?? code);
+        path.style.transition = "fill 0.3s ease";
 
-    <!-- Oceania -->
-    <path id="region-OC"
-      d="M722,282 L822,272 L842,342 L802,382 L722,372 L702,322 Z"
-      fill="#1a1a2e" stroke="#444" stroke-width="1.5" class="region"
-      onclick="selectRegion('OC')"/>
-    <text x="772" y="332" fill="#666" font-size="12"
-      text-anchor="middle" pointer-events="none">OCEANIA</text>
+        if (isPlayer && cityIdx !== undefined) {
+          path.style.cursor = "pointer";
+          path.addEventListener("click", () => {
+            selectCountry(code, feature.properties.name, cityIdx);
+          });
+          path.addEventListener("touchend", (e) => {
+            e.preventDefault();
+            selectCountry(code, feature.properties.name, cityIdx);
+          });
+        }
 
-  </svg>`;
-}
+        svg.appendChild(path);
+      });
+    });
 
-function selectRegion(code) {
-  if (!isPlayer) return;
-  const region = REGION_MAP[code];
-  if (!region) return;
-  selectedCityIdx = region.cityStart;
-  document.getElementById("action-status").textContent =
-    `Targeting: ${region.label}`;
+    grid.innerHTML = "";
+    grid.appendChild(svg);
 
-  // Highlight selected region
-  document.querySelectorAll(".region").forEach(r => {
-    r.setAttribute("stroke", "#444");
-    r.setAttribute("stroke-width", "1.5");
-  });
-  const path = document.getElementById(`region-${code}`);
-  if (path) {
-    path.setAttribute("stroke", "#ffffff");
-    path.setAttribute("stroke-width", "3");
+  } catch (e) {
+    console.error("Map load error:", e);
+    grid.innerHTML = `<p style="color:#ef4444;text-align:center;">
+      Map failed to load. Check connection.</p>`;
   }
 }
 
-function buildRegionSelect() {
-  // Region select is handled by tapping the SVG map directly
-  // Default target is North America
-  selectedCityIdx = 0;
+// Simple equirectangular projection
+function project(lon, lat) {
+  const x = (lon + 180) * (1000 / 360);
+  const y = (90 - lat) * (500 / 180);
+  return [x, y];
+}
+
+function geoToPaths(geometry) {
+  const rings = [];
+
+  const processRing = (coords) => {
+    if (!coords || coords.length === 0) return null;
+    const points = coords.map(([lon, lat]) => project(lon, lat));
+    return "M" + points.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join("L") + "Z";
+  };
+
+  if (geometry.type === "Polygon") {
+    geometry.coordinates.forEach(ring => rings.push(processRing(ring)));
+  } else if (geometry.type === "MultiPolygon") {
+    geometry.coordinates.forEach(poly =>
+      poly.forEach(ring => rings.push(processRing(ring)))
+    );
+  }
+
+  return rings;
+}
+
+function selectCountry(code, name, cityIdx) {
+  if (!isPlayer || moveSubmitted) return;
+  selectedCityIdx = cityIdx;
+  selectedCountryName = name;
+
+  // Reset all strokes
+  document.querySelectorAll("[data-code]").forEach(p => {
+    p.setAttribute("stroke", "#2a2a4a");
+    p.setAttribute("stroke-width", "0.5");
+  });
+
+  // Highlight selected country and neighbors (same city)
+  document.querySelectorAll(`[data-city="${cityIdx}"]`).forEach(p => {
+    p.setAttribute("stroke", "#ffffff");
+    p.setAttribute("stroke-width", "1.5");
+  });
+
   document.getElementById("action-status").textContent =
-    "Tap a continent to target it";
+    `Targeting: ${name}`;
 }
 
 // ── MAP REFRESH ───────────────────────────────────────────────────
@@ -302,24 +420,22 @@ async function refreshMap() {
       }
     }
 
-    // Tally dominant owner per region
-    const regionOwners = {};
-    for (const [code, region] of Object.entries(REGION_MAP)) {
-      const tally = {};
-      for (let i = region.cityStart; i < region.cityStart + 5; i++) {
-        const owner = await contract.getCityOwner(i);
-        if (owner !== ethers.ZeroAddress) {
-          tally[owner] = (tally[owner] || 0) + 1;
-        }
-      }
-      const dominant = Object.entries(tally).sort((a, b) => b[1] - a[1])[0];
-      if (dominant) regionOwners[code] = dominant[0];
+    // Fetch all city owners
+    for (let i = 0; i < TOTAL_CITIES; i++) {
+      cityOwnerCache[i] = await contract.getCityOwner(i);
     }
 
-    // Paint regions
-    for (const [code, owner] of Object.entries(regionOwners)) {
-      const path = document.getElementById(`region-${code}`);
-      if (!path) continue;
+    // Paint every country path
+    document.querySelectorAll("[data-code]").forEach(path => {
+      const cityIdx = parseInt(path.getAttribute("data-city"));
+      if (cityIdx < 0 || cityIdx === undefined) return;
+
+      const owner = cityOwnerCache[cityIdx];
+      if (!owner || owner === ethers.ZeroAddress) {
+        path.setAttribute("fill", "#1a1a2e");
+        return;
+      }
+
       const colorIdx = playerAddressMap[owner] ?? 0;
       const color = COLORS[colorIdx % COLORS.length];
       path.setAttribute("fill", color);
@@ -330,12 +446,9 @@ async function refreshMap() {
         owner.toLowerCase() === burnerWallet.address.toLowerCase()
       ) {
         path.setAttribute("stroke", "#ffffff");
-        path.setAttribute("stroke-width", "3");
-      } else {
-        path.setAttribute("stroke", "#444");
         path.setAttribute("stroke-width", "1.5");
       }
-    }
+    });
 
     await refreshLeaderboard(playerCount);
   } catch (e) {
@@ -433,7 +546,7 @@ async function startPlayerGameLoop() {
         moveSubmitted = false;
         resetActionButtons();
         document.getElementById("action-status").textContent =
-          "Tap a continent to target it";
+          "Tap a country to target it";
       }
 
       if (phase === 2) {
@@ -447,6 +560,11 @@ async function startPlayerGameLoop() {
 // ── SUBMIT MOVE ───────────────────────────────────────────────────
 async function submitMove(isAttack) {
   if (moveSubmitted) return;
+  if (selectedCityIdx === undefined || selectedCityIdx === null) {
+    document.getElementById("move-status").textContent =
+      "❌ Tap a country first";
+    return;
+  }
 
   const attackBtn = document.querySelector(".btn-attack");
   const fortifyBtn = document.querySelector(".btn-fortify");
@@ -460,12 +578,9 @@ async function submitMove(isAttack) {
     const tx = await contract.submitMove(isAttack, selectedCityIdx);
     await tx.wait();
     moveSubmitted = true;
-    const regionLabel = Object.values(REGION_MAP).find(
-      r => r.cityStart === selectedCityIdx
-    )?.label ?? `City ${selectedCityIdx + 1}`;
     statusEl.textContent = isAttack
-      ? `⚔️ Attacking ${regionLabel}`
-      : `🛡️ Fortified ${regionLabel}`;
+      ? `⚔️ Attacking ${selectedCountryName}`
+      : `🛡️ Fortified ${selectedCountryName}`;
     document.getElementById("action-status").textContent = "Move locked ✅";
   } catch (e) {
     console.error(e);
@@ -518,9 +633,11 @@ async function showWinner() {
     document.getElementById("winner-address").style.color =
       COLORS[colorIdx % COLORS.length];
 
-    const cityCount = Number(await contract.getPlayerCityCount(winnerAddr));
+    const cityCount = Number(
+      await contract.getPlayerCityCount(winnerAddr)
+    );
     document.getElementById("winner-cities").textContent =
-      `Controlled ${cityCount} of ${TOTAL_CITIES} cities`;
+      `Controlled ${cityCount} of ${TOTAL_CITIES} territories`;
 
     showScreen("winner-screen");
   } catch (e) {
