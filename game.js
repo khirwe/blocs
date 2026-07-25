@@ -137,15 +137,26 @@ async function fundBurnerIfNeeded(address) {
   try {
     const statusEl = document.getElementById("join-status");
     if (statusEl) statusEl.textContent = "Funding wallet...";
-    
-    // Fire and forget — don't await the response
+
+    // Fire the fund request
     fetch(`/api/fund?address=${address}`)
       .then(r => r.json())
       .then(data => console.log("Fund result:", data))
       .catch(e => console.error("Fund error:", e));
 
-    // Wait 3 seconds for the tx to land then proceed
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    // Poll balance until funds arrive — max 15 seconds
+    const maxAttempts = 15;
+    for (let i = 0; i < maxAttempts; i++) {
+      const balance = await provider.getBalance(address);
+      if (balance > 0n) {
+        console.log("Wallet funded:", balance.toString());
+        return;
+      }
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+
+    // Proceed anyway after timeout
+    console.warn("Funding timeout — proceeding anyway");
 
   } catch (e) {
     console.error("Funding failed:", e);
