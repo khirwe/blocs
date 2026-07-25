@@ -2,80 +2,83 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
   <title>BLOCS</title>
   <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
 
-  <!-- LOBBY -->
-  <div id="lobby-screen" class="screen active">
-    <h1>BLOCS</h1>
-    <p class="subtitle">Conquer the world. One block at a time.</p>
-    <div id="qr-container"></div>
-    <p id="player-count-display">Players joined: 0</p>
-    <button id="start-btn" class="btn-primary" onclick="startGame()">
-      START GAME
-    </button>
-    <p class="hint">Share the URL for others to join on their phone</p>
-  </div>
+<!-- LOBBY -->
+<div id="lobby-screen" class="screen active">
+  <h1>BLOCS</h1>
+  <p class="subtitle">Conquer the world. One block at a time.</p>
+  <div id="qr-container"></div>
+  <p id="player-count-display">Players joined: 0</p>
+  <button id="start-btn" class="btn-primary" onclick="startGame()">
+    START GAME
+  </button>
+  <button id="reset-btn" class="btn-reset" onclick="resetGame()" style="display:none;">
+    RESET GAME
+  </button>
+  <p class="hint">Share the URL for others to join on their phone</p>
+</div>
 
-  <!-- JOIN -->
-  <div id="join-screen" class="screen">
-    <h2>BLOCS</h2>
-    <p id="join-status">Setting up wallet...</p>
-    <div id="player-city-display"></div>
-  </div>
+<!-- JOIN -->
+<div id="join-screen" class="screen">
+  <h2>BLOCS</h2>
+  <p id="join-status">Setting up wallet...</p>
+  <div id="player-city-display"></div>
+</div>
 
-  <!-- GAME -->
-  <div id="game-screen" class="screen">
-    <div id="game-layout">
+<!-- GAME -->
+<div id="game-screen" class="screen">
+  <div id="game-layout">
 
-      <div id="map-container">
-        <h2 id="round-display">ROUND 1</h2>
-        <div id="city-grid"></div>
-        <div id="timer-bar-container">
-          <div id="timer-bar"></div>
-        </div>
-        <p id="timer-display">7</p>
+    <div id="map-container">
+      <h2 id="round-display">ROUND 1</h2>
+      <div id="city-grid"></div>
+      <div id="timer-container">
+        <div id="timer-bar"></div>
+        <span id="timer-display">7</span>
       </div>
-
-      <div id="leaderboard-container">
-        <h3>LEADERBOARD</h3>
-        <div id="leaderboard"></div>
-      </div>
-
     </div>
 
-    <!-- PLAYER ACTIONS -->
-    <div id="action-panel">
-      <p id="action-status">Tap a continent to target it</p>
-      <div id="action-buttons">
-        <button class="btn-attack" onclick="submitMove(true)">
-          ⚔️ ATTACK
-        </button>
-        <button class="btn-fortify" onclick="submitMove(false)">
-          🛡️ FORTIFY
-        </button>
-      </div>
-      <p id="move-status"></p>
+    <div id="leaderboard-container">
+      <h3>LEADERBOARD</h3>
+      <div id="leaderboard"></div>
     </div>
+
   </div>
 
-  <!-- WINNER -->
-  <div id="winner-screen" class="screen">
-    <div id="winner-content">
-      <p class="winner-label">GLOBAL OVERLORD</p>
-      <h1 id="winner-address"></h1>
-      <p id="winner-cities"></p>
-      <button class="btn-primary" onclick="location.reload()">
-        PLAY AGAIN
+  <!-- PLAYER ACTIONS -->
+  <div id="action-panel">
+    <p id="action-status">Tap a country to target it</p>
+    <div id="action-buttons">
+      <button class="btn-attack" onclick="submitMove(true)">
+        ⚔️ ATTACK
+      </button>
+      <button class="btn-fortify" onclick="submitMove(false)">
+        🛡️ FORTIFY
       </button>
     </div>
+    <p id="move-status"></p>
   </div>
+</div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <script src="game.js"></script>
+<!-- WINNER -->
+<div id="winner-screen" class="screen">
+  <div id="winner-content">
+    <p class="winner-label">GLOBAL OVERLORD</p>
+    <h1 id="winner-address"></h1>
+    <p id="winner-cities"></p>
+    <button class="btn-primary" onclick="location.reload()">
+      PLAY AGAIN
+    </button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="game.js"></script>
 </body>
 </html>
