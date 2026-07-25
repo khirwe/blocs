@@ -137,9 +137,16 @@ async function fundBurnerIfNeeded(address) {
   try {
     const statusEl = document.getElementById("join-status");
     if (statusEl) statusEl.textContent = "Funding wallet...";
-    const res = await fetch(`/api/fund?address=${address}`);
-    const data = await res.json();
-    console.log("Fund result:", data);
+    
+    // Fire and forget — don't await the response
+    fetch(`/api/fund?address=${address}`)
+      .then(r => r.json())
+      .then(data => console.log("Fund result:", data))
+      .catch(e => console.error("Fund error:", e));
+
+    // Wait 3 seconds for the tx to land then proceed
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
   } catch (e) {
     console.error("Funding failed:", e);
   }
