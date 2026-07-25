@@ -80,16 +80,34 @@ async function fundBurnerIfNeeded(burnerAddress) {
 
 // ── HOST SETUP ───────────────────────────────────────────────────
 async function setupHost() {
-  if (!window.ethereum) {
-    alert("MetaMask required on host screen");
-    return;
+  provider = new ethers.JsonRpcProvider(RPC_URL);
+
+  // Host burner — auto-signs resolveRound() with no popups
+  let hostKey = localStorage.getItem("blocs_host_pk");
+  if (!hostKey) {
+    const fresh = ethers.Wallet.createRandom();
+    hostKey = fresh.privateKey;
+    localStorage.setItem("blocs_host_pk", hostKey);
   }
 
-  provider = new ethers.BrowserProvider(window.ethereum);
-  await provider.send("eth_requestAccounts", []);
-  signer = await provider.getSigner();
+  burnerWallet = new ethers.Wallet(hostKey, provider);
+  signer = burnerWallet;
   contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
 
+  // Fund host burner
+  await fundBurnerIfNeeded(burnerWallet.address);
+
+  const joinURL = window.location.origin + window.location.pathname;
+  new QRCode(document.getElementById("qr-container"), {
+    text: joinURL,
+    width: 180,
+    height: 180,
+    colorDark: "#000000",
+    colorLight: "#ffffff",
+  });
+
+  pollInterval = setInterval(updateLobbyCount, 2000);
+}
   // Generate QR code for player join URL
   const joinURL = window.location.origin + window.location.pathname;
   new QRCode(document.getElementById("qr-container"), {
