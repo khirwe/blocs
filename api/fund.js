@@ -8,7 +8,7 @@ export default async function handler(req, res) {
   }
 
   if (!process.env.FUNDER_KEY) {
-    return res.status(500).json({ error: "FUNDER_KEY not set in environment" });
+    return res.status(500).json({ error: "FUNDER_KEY not set" });
   }
 
   try {
@@ -23,7 +23,7 @@ export default async function handler(req, res) {
         to: address,
         value: ethers.parseEther("0.5"),
       });
-      await tx.wait();
+      // Don't await tx.wait() — return immediately
       return res.status(200).json({ funded: true, tx: tx.hash });
     }
 
