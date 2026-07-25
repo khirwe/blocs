@@ -41,7 +41,7 @@ let provider, signer, contract, burnerWallet;
 let isHost = false;
 let isPlayer = false;
 let myCity = null;
-let playerAddressMap = {}; // address => colorIndex
+let playerAddressMap = {};
 let timerInterval = null;
 let pollInterval = null;
 let moveSubmitted = false;
@@ -66,9 +66,20 @@ function detectRole() {
   }
 }
 
+// ── FUND BURNER ───────────────────────────────────────────────────
+async function fundBurnerIfNeeded(burnerAddress) {
+  try {
+    document.getElementById("join-status").textContent = "Funding wallet...";
+    const res = await fetch(`/api/fund?address=${burnerAddress}`);
+    const data = await res.json();
+    console.log("Fund result:", data);
+  } catch (e) {
+    console.error("Funding failed:", e);
+  }
+}
+
 // ── HOST SETUP ───────────────────────────────────────────────────
 async function setupHost() {
-  // Host uses MetaMask
   if (!window.ethereum) {
     alert("MetaMask required on host screen");
     return;
@@ -124,10 +135,15 @@ async function setupPlayer() {
   document.getElementById("join-status").textContent = "Setting up wallet...";
 
   // Create or load burner wallet
-  let privateKey = localStorage.getItem("blocs_burner_pk");
+  let privateKey = new URLSearchParams(window.location.search).get("pk");
+
   if (!privateKey) {
-    burnerWallet = ethers.Wallet.createRandom();
-    privateKey = burnerWallet.privateKey;
+    privateKey = localStorage.getItem("blocs_burner_pk");
+  }
+
+  if (!privateKey) {
+    const fresh = ethers.Wallet.createRandom();
+    privateKey = fresh.privateKey;
     localStorage.setItem("blocs_burner_pk", privateKey);
   }
 
@@ -135,6 +151,9 @@ async function setupPlayer() {
   burnerWallet = new ethers.Wallet(privateKey, provider);
   signer = burnerWallet;
   contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+
+  // Fund burner via Vercel serverless function
+  await fundBurnerIfNeeded(burnerWallet.address);
 
   document.getElementById("join-status").textContent = "Joining game...";
 
@@ -151,7 +170,7 @@ async function setupPlayer() {
 
     document.getElementById("join-status").textContent = "✅ Joined!";
     document.getElementById("player-city-display").textContent =
-      `Your starting city: #${cityId}`;
+      `Your starting city: #${cityId + 1}`;
 
     // Wait for game to start
     pollInterval = setInterval(checkGameStart, 2000);
@@ -174,7 +193,7 @@ async function getPlayerCity(address) {
 async function checkGameStart() {
   try {
     const phase = await contract.getPhase();
-    if (phase === 1) { // Active
+    if (Number(phase) === 1) {
       clearInterval(pollInterval);
       showScreen("game-screen");
       buildCityGrid();
@@ -231,14 +250,19 @@ async function refreshMap() {
       if (owner === ethers.ZeroAddress) {
         cell.style.background = "#1a1a2e";
         cell.style.borderColor = "#333";
+        cell.style.borderWidth = "2px";
       } else {
         const colorIdx = playerAddressMap[owner] ?? 0;
         const color = COLORS[colorIdx % COLORS.length];
         cell.style.background = color;
         cell.style.borderColor = color;
 
-        // Highlight your own city
-        if (isPlayer && owner.toLowerCase() === burnerWallet?.address.toLowerCase()) {
+        // Highlight your own cities
+        if (
+          isPlayer &&
+          burnerWallet &&
+          owner.toLowerCase() === burnerWallet.address.toLowerCase()
+        ) {
           cell.style.borderColor = "#ffffff";
           cell.style.borderWidth = "3px";
         }
@@ -255,6 +279,7 @@ async function refreshMap() {
 
 async function refreshLeaderboard(playerCount) {
   const lb = document.getElementById("leaderboard");
+  if (!lb) return;
   lb.innerHTML = "";
 
   let entries = [];
@@ -299,17 +324,16 @@ async function startHostGameLoop() {
     const duration = isLast ? FINAL_ROUND_TIMER : ROUND_TIMER;
 
     document.getElementById("round-display").textContent =
-      `ROUND ${round} ${isLast ? "— FINAL" : ""}`;
+      `ROUND ${round}${isLast ? " — FINAL" : ""}`;
 
     startTimer(duration, async () => {
-      // Resolve round on chain
       try {
         const tx = await contract.resolveRound();
         await tx.wait();
         await refreshMap();
 
         const phase = Number(await contract.getPhase());
-        if (phase === 2) { // Ended
+        if (phase === 2) {
           await showWinner();
           return;
         }
@@ -328,8 +352,6 @@ async function startHostGameLoop() {
 // ── PLAYER GAME LOOP ──────────────────────────────────────────────
 async function startPlayerGameLoop() {
   await refreshMap();
-
-  // Poll for round changes and map updates
   let lastRound = 1;
 
   pollInterval = setInterval(async () => {
@@ -337,13 +359,17 @@ async function startPlayerGameLoop() {
       const round = Number(await contract.currentRound());
       const phase = Number(await contract.getPhase());
 
-      document.getElementById("round-display").textContent = `ROUND ${round}`;
+      document.getElementById("round-display").textContent =
+        `ROUND ${round}`;
+
       await refreshMap();
 
       if (round !== lastRound) {
         lastRound = round;
         moveSubmitted = false;
         resetActionButtons();
+        document.getElementById("action-status").textContent =
+          "Choose your move";
       }
 
       if (phase === 2) {
@@ -358,7 +384,9 @@ async function startPlayerGameLoop() {
 async function submitMove(isAttack) {
   if (moveSubmitted) return;
 
-  const targetCity = parseInt(document.getElementById("city-select").value);
+  const targetCity = parseInt(
+    document.getElementById("city-select").value
+  );
   const statusEl = document.getElementById("move-status");
   const attackBtn = document.querySelector(".btn-attack");
   const fortifyBtn = document.querySelector(".btn-fortify");
@@ -372,8 +400,9 @@ async function submitMove(isAttack) {
     await tx.wait();
     moveSubmitted = true;
     statusEl.textContent = isAttack
-      ? `⚔️ Attack on City ${targetCity + 1} sent!`
-      : `🛡️ Fortified City ${targetCity + 1}!`;
+      ? `⚔️ Attacking City ${targetCity + 1}`
+      : `🛡️ Fortified City ${targetCity + 1}`;
+    document.getElementById("action-status").textContent = "Move locked in ✅";
   } catch (e) {
     console.error(e);
     statusEl.textContent = "❌ Failed — try again";
@@ -396,6 +425,8 @@ function startTimer(duration, onComplete) {
   const timerBar = document.getElementById("timer-bar");
   const timerDisplay = document.getElementById("timer-display");
   let remaining = duration;
+
+  if (timerInterval) clearInterval(timerInterval);
 
   timerBar.style.width = "100%";
   timerBar.style.background = "#7c3aed";
@@ -426,9 +457,11 @@ async function showWinner() {
     document.getElementById("winner-address").style.color =
       COLORS[colorIdx % COLORS.length];
 
-    const cityCount = Number(await contract.getPlayerCityCount(winnerAddr));
+    const cityCount = Number(
+      await contract.getPlayerCityCount(winnerAddr)
+    );
     document.getElementById("winner-cities").textContent =
-      `Controlled ${cityCount} cities`;
+      `Controlled ${cityCount} of ${TOTAL_CITIES} cities`;
 
     showScreen("winner-screen");
   } catch (e) {
@@ -438,6 +471,8 @@ async function showWinner() {
 
 // ── HELPERS ───────────────────────────────────────────────────────
 function showScreen(id) {
-  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.querySelectorAll(".screen").forEach(s =>
+    s.classList.remove("active")
+  );
   document.getElementById(id).classList.add("active");
 }
