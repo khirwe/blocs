@@ -1,13 +1,15 @@
-// ── CONFIG ──────────────────────────────────────────────────────────────────
-const CONTRACT_ADDRESS = "0x6B35346e6AeFEEb85D812dd12EDD5C2969e64DC3";
+// ── CONFIG ───────────────────────────────────────────────────────────────────
+const CONTRACT_ADDRESS = "0xD395DE7D5d58746AcB20aa00510c5ec41313a5F7";
 const RPC_URL = "https://testnet-rpc.monad.xyz";
 const TOTAL_CITIES = 30;
 const ROUND_TIMER = 7;
 const FINAL_ROUND_TIMER = 5;
 const TOTAL_ROUNDS = 5;
+
 const ABI = [
   "function join() external",
   "function startGame() external",
+  "function resetGame() external",
   "function submitMove(bool isAttack, uint8 targetCity) external",
   "function resolveRound() external",
   "function getPhase() external view returns (uint8)",
@@ -21,8 +23,10 @@ const ABI = [
   "event PlayerJoined(address player, uint8 cityId)",
   "event RoundResolved(uint8 round)",
   "event GameEnded(address winner, uint8 cityCount)",
-  "event CityFlipped(uint8 cityId, address newOwner)"
+  "event CityFlipped(uint8 cityId, address newOwner)",
+  "event GameReset()"
 ];
+
 const COLORS = [
   "#ef4444","#f97316","#eab308","#22c55e","#14b8a6",
   "#3b82f6","#8b5cf6","#ec4899","#f43f5e","#10b981",
@@ -31,57 +35,34 @@ const COLORS = [
   "#0891b2","#dc2626","#d97706","#059669","#2563eb",
   "#9333ea","#db2777","#65a30d","#0284c7","#7c3aed"
 ];
+
 const COUNTRY_TO_CITY = {
-  // North America (0-4)
-  "us": 0, "ca": 1, "mx": 2, "gt": 3, "bz": 3, "hn": 3,
-  "sv": 3, "ni": 3, "cr": 3, "pa": 3, "cu": 4, "jm": 4,
-  "ht": 4, "do": 4, "pr": 4, "tt": 4, "bs": 4, "bb": 4,
-  "lc": 4, "vc": 4, "gd": 4, "ag": 4, "dm": 4, "kn": 4,
-  "gl": 1, "pm": 1,
-  // South America (5-9)
-  "br": 5, "ar": 6, "co": 7, "ve": 7, "pe": 8, "cl": 8,
-  "ec": 8, "bo": 8, "py": 9, "uy": 9, "gy": 9, "sr": 9,
-  "gf": 9, "fk": 9,
-  // Europe (10-14)
-  "de": 10, "fr": 10, "gb": 11, "it": 11, "es": 12,
-  "pt": 12, "nl": 12, "be": 12, "ch": 12, "at": 12,
-  "pl": 13, "cz": 13, "sk": 13, "hu": 13, "ro": 13,
-  "bg": 13, "rs": 13, "hr": 13, "si": 13, "ba": 13,
-  "me": 13, "mk": 13, "al": 13, "gr": 13, "cy": 13,
-  "se": 11, "no": 11, "dk": 11, "fi": 11, "is": 11,
-  "ie": 11, "lu": 12, "li": 12, "mc": 12, "ad": 12,
-  "sm": 12, "va": 12, "mt": 12, "ee": 13, "lv": 13,
-  "lt": 13, "by": 13, "ua": 13, "md": 13, "ru": 14,
-  "tr": 14, "ge": 14, "am": 14, "az": 14,
-  // Africa (15-19)
-  "ng": 15, "et": 15, "eg": 16, "cd": 15, "tz": 17,
-  "ke": 17, "za": 18, "ug": 17, "dz": 16, "sd": 16,
-  "ma": 16, "ao": 18, "mz": 18, "gh": 15, "mg": 19,
-  "cm": 15, "ci": 15, "ne": 16, "bf": 15, "ml": 16,
-  "mw": 18, "zm": 18, "sn": 15, "so": 17, "td": 16,
-  "gn": 15, "rw": 17, "bj": 15, "tn": 16, "bi": 17,
-  "ss": 16, "tg": 15, "sl": 15, "ly": 16, "cg": 15,
-  "lr": 15, "cf": 15, "mr": 16, "er": 17, "gm": 15,
-  "bw": 18, "na": 18, "ga": 15, "ls": 18, "gq": 15,
-  "gw": 15, "mu": 19, "sz": 18, "dj": 17, "km": 19,
-  "cv": 15, "st": 15, "sc": 19, "eh": 16,
-  // Asia (20-24)
-  "cn": 20, "in": 21, "id": 22, "pk": 21, "bd": 21,
-  "jp": 20, "ph": 22, "vn": 22, "ir": 23, "th": 22,
-  "mm": 22, "kr": 20, "iq": 23, "af": 23, "sa": 23,
-  "uz": 24, "my": 22, "ye": 23, "np": 21, "kp": 20,
-  "tw": 20, "sy": 23, "lk": 21, "kz": 24, "kh": 22,
-  "jo": 23, "ae": 23, "tj": 24, "la": 22, "il": 23,
-  "lb": 23, "kg": 24, "tm": 24, "sg": 22, "om": 23,
-  "ps": 23, "kw": 23, "mn": 20, "qa": 23, "bh": 23,
-  "tl": 22, "bn": 22, "bt": 21, "mv": 21, "mo": 20,
-  "hk": 20,
-  // Oceania (25-29)
-  "au": 25, "pg": 26, "nz": 27, "fj": 28, "sb": 26,
-  "vu": 28, "ws": 28, "ki": 28, "to": 28, "fm": 26,
-  "pw": 26, "mh": 28, "nr": 28, "tv": 28, "ck": 29,
-  "nu": 29, "wf": 28, "as": 28, "pf": 29, "nc": 26,
-  "gu": 26, "mp": 26,
+  "us":0,"ca":1,"mx":2,"gt":3,"bz":3,"hn":3,"sv":3,"ni":3,"cr":3,"pa":3,
+  "cu":4,"jm":4,"ht":4,"do":4,"pr":4,"tt":4,"bs":4,"bb":4,"lc":4,"vc":4,
+  "gd":4,"ag":4,"dm":4,"kn":4,"gl":1,"pm":1,
+  "br":5,"ar":6,"co":7,"ve":7,"pe":8,"cl":8,"ec":8,"bo":8,"py":9,"uy":9,
+  "gy":9,"sr":9,"gf":9,"fk":9,
+  "de":10,"fr":10,"gb":11,"it":11,"es":12,"pt":12,"nl":12,"be":12,"ch":12,
+  "at":12,"pl":13,"cz":13,"sk":13,"hu":13,"ro":13,"bg":13,"rs":13,"hr":13,
+  "si":13,"ba":13,"me":13,"mk":13,"al":13,"gr":13,"cy":13,"se":11,"no":11,
+  "dk":11,"fi":11,"is":11,"ie":11,"lu":12,"li":12,"mc":12,"ad":12,"sm":12,
+  "va":12,"mt":12,"ee":13,"lv":13,"lt":13,"by":13,"ua":13,"md":13,"ru":14,
+  "tr":14,"ge":14,"am":14,"az":14,
+  "ng":15,"et":15,"eg":16,"cd":15,"tz":17,"ke":17,"za":18,"ug":17,"dz":16,
+  "sd":16,"ma":16,"ao":18,"mz":18,"gh":15,"mg":19,"cm":15,"ci":15,"ne":16,
+  "bf":15,"ml":16,"mw":18,"zm":18,"sn":15,"so":17,"td":16,"gn":15,"rw":17,
+  "bj":15,"tn":16,"bi":17,"ss":16,"tg":15,"sl":15,"ly":16,"cg":15,"lr":15,
+  "cf":15,"mr":16,"er":17,"gm":15,"bw":18,"na":18,"ga":15,"ls":18,"gq":15,
+  "gw":15,"mu":19,"sz":18,"dj":17,"km":19,"cv":15,"st":15,"sc":19,"eh":16,
+  "cn":20,"in":21,"id":22,"pk":21,"bd":21,"jp":20,"ph":22,"vn":22,"ir":23,
+  "th":22,"mm":22,"kr":20,"iq":23,"af":23,"sa":23,"uz":24,"my":22,"ye":23,
+  "np":21,"kp":20,"tw":20,"sy":23,"lk":21,"kz":24,"kh":22,"jo":23,"ae":23,
+  "tj":24,"la":22,"il":23,"lb":23,"kg":24,"tm":24,"sg":22,"om":23,"ps":23,
+  "kw":23,"mn":20,"qa":23,"bh":23,"tl":22,"bn":22,"bt":21,"mv":21,"mo":20,
+  "hk":20,
+  "au":25,"pg":26,"nz":27,"fj":28,"sb":26,"vu":28,"ws":28,"ki":28,"to":28,
+  "fm":26,"pw":26,"mh":28,"nr":28,"tv":28,"ck":29,"nu":29,"wf":28,"as":28,
+  "pf":29,"nc":26,"gu":26,"mp":26
 };
 
 // ── STATE ────────────────────────────────────────────────────────────────────
@@ -139,17 +120,32 @@ async function setupHost() {
   signer = burnerWallet;
   contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
   await fundBurnerIfNeeded(burnerWallet.address);
+
   const phase = Number(await contract.getPhase());
+
+  // Game already active — host rejoins running game
   if (phase === 1) {
     clearInterval(pollInterval);
     showScreen("game-screen");
-    // FIX 4: remove action panel — host never needs it
     const panel = document.getElementById("action-panel");
     if (panel) panel.remove();
     await buildMap();
     startHostGameLoop();
     return;
   }
+
+  // Game ended — show reset button so host can run a new game
+  if (phase === 2) {
+    showScreen("lobby-screen");
+    document.getElementById("start-btn").style.display = "none";
+    const resetBtn = document.getElementById("reset-btn");
+    if (resetBtn) resetBtn.style.display = "inline-block";
+    document.getElementById("player-count-display").textContent =
+      "Game ended. Reset to play again.";
+    return;
+  }
+
+  // Phase 0 — normal lobby
   const joinURL = window.location.origin + window.location.pathname;
   new QRCode(document.getElementById("qr-container"), {
     text: joinURL,
@@ -169,6 +165,43 @@ async function updateLobbyCount() {
   } catch (e) {}
 }
 
+// ── RESET GAME ───────────────────────────────────────────────────────────────
+async function resetGame() {
+  const resetBtn = document.getElementById("reset-btn");
+  try {
+    if (resetBtn) { resetBtn.disabled = true; resetBtn.textContent = "Resetting..."; }
+    const tx = await contract.resetGame();
+    await tx.wait();
+    // Clear local state
+    playerAddressMap = {};
+    cityOwnerCache = {};
+    moveSubmitted = false;
+    // Refresh lobby UI
+    document.getElementById("start-btn").style.display = "inline-block";
+    if (resetBtn) { resetBtn.style.display = "none"; resetBtn.disabled = false; resetBtn.textContent = "RESET GAME"; }
+    document.getElementById("player-count-display").textContent = "Players joined: 0";
+    // Rebuild QR if needed
+    const qrContainer = document.getElementById("qr-container");
+    if (qrContainer && qrContainer.innerHTML === "") {
+      const joinURL = window.location.origin + window.location.pathname;
+      new QRCode(qrContainer, {
+        text: joinURL,
+        width: 180,
+        height: 180,
+        colorDark: "#000000",
+        colorLight: "#ffffff",
+      });
+    }
+    clearInterval(pollInterval);
+    pollInterval = setInterval(updateLobbyCount, 2000);
+  } catch (e) {
+    console.error("Reset failed:", e);
+    if (resetBtn) { resetBtn.disabled = false; resetBtn.textContent = "RESET GAME"; }
+    alert("Reset failed: " + e.message);
+  }
+}
+
+// ── START GAME ───────────────────────────────────────────────────────────────
 async function startGame() {
   try {
     document.getElementById("start-btn").disabled = true;
@@ -177,7 +210,6 @@ async function startGame() {
     await tx.wait();
     clearInterval(pollInterval);
     showScreen("game-screen");
-    // FIX 4: remove action panel — host never needs it
     const panel = document.getElementById("action-panel");
     if (panel) panel.remove();
     await buildMap();
@@ -206,7 +238,9 @@ async function setupPlayer() {
   signer = burnerWallet;
   contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
   await fundBurnerIfNeeded(burnerWallet.address);
+
   const phase = Number(await contract.getPhase());
+
   if (phase === 1) {
     statusEl.textContent = "Game in progress...";
     try {
@@ -221,10 +255,14 @@ async function setupPlayer() {
       document.getElementById("action-panel").style.display = "flex";
       startPlayerGameLoop();
       return;
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) { console.error(e); }
   }
+
+  if (phase === 2) {
+    statusEl.textContent = "Game has ended. Wait for host to reset.";
+    return;
+  }
+
   statusEl.textContent = "Joining game...";
   try {
     const playerData = await contract.players(burnerWallet.address);
@@ -261,12 +299,18 @@ async function checkGameStart() {
       document.getElementById("action-panel").style.display = "flex";
       startPlayerGameLoop();
     }
+    if (phase === 2) {
+      clearInterval(pollInterval);
+      document.getElementById("join-status").textContent =
+        "Game ended. Wait for host to reset.";
+    }
   } catch (e) {}
 }
 
-// ── MAP ───────────────────────────────────────────────────────────────────────
+// ── MAP BUILD ────────────────────────────────────────────────────────────────
 async function buildMap() {
   const grid = document.getElementById("city-grid");
+  grid.style.display = "block";
   grid.innerHTML = `<p style="color:#666;text-align:center;padding:20px;">Loading map...</p>`;
   try {
     const res = await fetch(
@@ -279,9 +323,12 @@ async function buildMap() {
     svg.setAttribute("id", "world-svg");
     svg.style.width = "100%";
     svg.style.height = "auto";
+    svg.style.display = "block";
     svg.style.background = "#0d1117";
     svg.style.borderRadius = "12px";
     svg.style.cursor = "pointer";
+    svg.style.touchAction = "manipulation";
+
     geojson.features.forEach(feature => {
       const code = feature.properties.iso_a2?.toLowerCase();
       if (!code) return;
@@ -442,10 +489,7 @@ async function startHostGameLoop() {
         await tx.wait();
         await refreshMap();
         const phase = Number(await contract.getPhase());
-        if (phase === 2) {
-          await showWinner();
-          return;
-        }
+        if (phase === 2) { await showWinner(); return; }
         round++;
         runRound();
       } catch (e) {
@@ -457,11 +501,9 @@ async function startHostGameLoop() {
 }
 
 // ── PLAYER GAME LOOP ──────────────────────────────────────────────────────────
-// FIX 3: player now gets a live visual timer synced to round changes
 async function startPlayerGameLoop() {
   await refreshMap();
   let lastRound = 1;
-  // Start the visual timer immediately for the first round
   startTimer(ROUND_TIMER, () => {});
   pollInterval = setInterval(async () => {
     try {
@@ -475,7 +517,6 @@ async function startPlayerGameLoop() {
         resetActionButtons();
         document.getElementById("action-status").textContent =
           "Tap a country to target it";
-        // Restart timer on each new round; final round gets shorter timer
         const isLast = round === TOTAL_ROUNDS;
         startTimer(isLast ? FINAL_ROUND_TIMER : ROUND_TIMER, () => {});
       }
@@ -531,6 +572,7 @@ function startTimer(duration, onComplete) {
   if (timerInterval) clearInterval(timerInterval);
   const timerBar = document.getElementById("timer-bar");
   const timerDisplay = document.getElementById("timer-display");
+  if (!timerBar || !timerDisplay) return;
   let remaining = duration;
   timerBar.style.width = "100%";
   timerBar.style.background = "#7c3aed";
@@ -555,9 +597,7 @@ async function showWinner() {
     document.getElementById("winner-address").textContent = winnerAddr;
     document.getElementById("winner-address").style.color =
       COLORS[colorIdx % COLORS.length];
-    const cityCount = Number(
-      await contract.getPlayerCityCount(winnerAddr)
-    );
+    const cityCount = Number(await contract.getPlayerCityCount(winnerAddr));
     document.getElementById("winner-cities").textContent =
       `Controlled ${cityCount} of ${TOTAL_CITIES} territories`;
     showScreen("winner-screen");
@@ -568,8 +608,6 @@ async function showWinner() {
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function showScreen(id) {
-  document.querySelectorAll(".screen").forEach(s =>
-    s.classList.remove("active")
-  );
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
   document.getElementById(id).classList.add("active");
 }
