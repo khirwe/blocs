@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>BLOCS</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
 
-  <!-- LOBBY SCREEN -->
+  <!-- LOBBY -->
   <div id="lobby-screen" class="screen active">
     <h1>BLOCS</h1>
     <p class="subtitle">Conquer the world. One block at a time.</p>
@@ -20,18 +20,17 @@
     <p class="hint">Share the URL for others to join on their phone</p>
   </div>
 
-  <!-- PLAYER JOIN SCREEN (shown on phone) -->
+  <!-- JOIN -->
   <div id="join-screen" class="screen">
     <h2>BLOCS</h2>
-    <p id="join-status">Joining game...</p>
+    <p id="join-status">Setting up wallet...</p>
     <div id="player-city-display"></div>
   </div>
 
-  <!-- GAME SCREEN -->
+  <!-- GAME -->
   <div id="game-screen" class="screen">
     <div id="game-layout">
 
-      <!-- LEFT: MAP -->
       <div id="map-container">
         <h2 id="round-display">ROUND 1</h2>
         <div id="city-grid"></div>
@@ -41,7 +40,6 @@
         <p id="timer-display">7</p>
       </div>
 
-      <!-- RIGHT: LEADERBOARD -->
       <div id="leaderboard-container">
         <h3>LEADERBOARD</h3>
         <div id="leaderboard"></div>
@@ -49,13 +47,9 @@
 
     </div>
 
-    <!-- PLAYER ACTION (shown on phone during game) -->
+    <!-- PLAYER ACTIONS -->
     <div id="action-panel">
-      <p id="action-status">Choose your move</p>
-      <div id="city-select-container">
-        <p>Target city:</p>
-        <select id="city-select"></select>
-      </div>
+      <p id="action-status">Tap a continent to target it</p>
       <div id="action-buttons">
         <button class="btn-attack" onclick="submitMove(true)">
           ⚔️ ATTACK
@@ -68,13 +62,12 @@
     </div>
   </div>
 
-  <!-- WINNER SCREEN -->
+  <!-- WINNER -->
   <div id="winner-screen" class="screen">
     <div id="winner-content">
       <p class="winner-label">GLOBAL OVERLORD</p>
       <h1 id="winner-address"></h1>
       <p id="winner-cities"></p>
-      <div id="final-leaderboard"></div>
       <button class="btn-primary" onclick="location.reload()">
         PLAY AGAIN
       </button>
