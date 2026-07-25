@@ -1,5 +1,5 @@
 // ── CONFIG ──────────────────────────────────────────────────────
-const CONTRACT_ADDRESS = "0xcbC15884F9cE612Ce7434D138aa132A419e4352f";
+const CONTRACT_ADDRESS = "0x6B35346e6AeFEEb85D812dd12EDD5C2969e64DC3";
 const RPC_URL = "https://testnet-rpc.monad.xyz";
 const TOTAL_CITIES = 30;
 const ROUND_TIMER = 7;
