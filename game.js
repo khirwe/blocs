@@ -3,9 +3,9 @@ const CONTRACT_ADDRESS = "0x0A8Ac86a38833b66A01702d414118FEf1ee65dAe";
 const RPC_URL = "https://testnet-rpc.monad.xyz";
 const CHAIN_ID = 10143;
 const TOTAL_CITIES = 30;
-const ROUND_TIMER = 7;       // seconds — change freely
-const FINAL_ROUND_TIMER = 5; // seconds — change freely
-const TOTAL_ROUNDS = 5;      // rounds — change freely
+const ROUND_TIMER = 7;
+const FINAL_ROUND_TIMER = 5;
+const TOTAL_ROUNDS = 5;
 
 const ABI = [
   "function join() external",
@@ -26,7 +26,6 @@ const ABI = [
   "event CityFlipped(uint8 cityId, address newOwner)"
 ];
 
-// ── PLAYER COLORS ────────────────────────────────────────────────
 const COLORS = [
   "#ef4444","#f97316","#eab308","#22c55e","#14b8a6",
   "#3b82f6","#8b5cf6","#ec4899","#f43f5e","#10b981",
@@ -36,7 +35,15 @@ const COLORS = [
   "#9333ea","#db2777","#65a30d","#0284c7","#7c3aed"
 ];
 
-// ── STATE ────────────────────────────────────────────────────────
+const REGION_MAP = {
+  NA: { label: "North America", cityStart: 0 },
+  SA: { label: "South America", cityStart: 5 },
+  EU: { label: "Europe",        cityStart: 10 },
+  AF: { label: "Africa",        cityStart: 15 },
+  AS: { label: "Asia",          cityStart: 20 },
+  OC: { label: "Oceania",       cityStart: 25 }
+};
+
 let provider, signer, contract, burnerWallet;
 let isHost = false;
 let isPlayer = false;
@@ -45,16 +52,16 @@ let playerAddressMap = {};
 let timerInterval = null;
 let pollInterval = null;
 let moveSubmitted = false;
+let selectedCityIdx = 0;
 
 // ── INIT ─────────────────────────────────────────────────────────
-window.addEventListener("load", async () => {
+window.addEventListener("load", () => {
   detectRole();
 });
 
 function detectRole() {
   const params = new URLSearchParams(window.location.search);
   const role = params.get("role");
-
   if (role === "host") {
     isHost = true;
     showScreen("lobby-screen");
@@ -67,10 +74,11 @@ function detectRole() {
 }
 
 // ── FUND BURNER ───────────────────────────────────────────────────
-async function fundBurnerIfNeeded(burnerAddress) {
+async function fundBurnerIfNeeded(address) {
   try {
-    document.getElementById("join-status").textContent = "Funding wallet...";
-    const res = await fetch(`/api/fund?address=${burnerAddress}`);
+    document.getElementById("join-status") &&
+      (document.getElementById("join-status").textContent = "Funding wallet...");
+    const res = await fetch(`/api/fund?address=${address}`);
     const data = await res.json();
     console.log("Fund result:", data);
   } catch (e) {
@@ -82,7 +90,6 @@ async function fundBurnerIfNeeded(burnerAddress) {
 async function setupHost() {
   provider = new ethers.JsonRpcProvider(RPC_URL);
 
-  // Host burner — auto-signs resolveRound() with no popups
   let hostKey = localStorage.getItem("blocs_host_pk");
   if (!hostKey) {
     const fresh = ethers.Wallet.createRandom();
@@ -94,7 +101,6 @@ async function setupHost() {
   signer = burnerWallet;
   contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
 
-  // Fund host burner
   await fundBurnerIfNeeded(burnerWallet.address);
 
   const joinURL = window.location.origin + window.location.pathname;
@@ -106,19 +112,6 @@ async function setupHost() {
     colorLight: "#ffffff",
   });
 
-  pollInterval = setInterval(updateLobbyCount, 2000);
-}
-  // Generate QR code for player join URL
-  const joinURL = window.location.origin + window.location.pathname;
-  new QRCode(document.getElementById("qr-container"), {
-    text: joinURL,
-    width: 180,
-    height: 180,
-    colorDark: "#000000",
-    colorLight: "#ffffff",
-  });
-
-  // Poll lobby player count
   pollInterval = setInterval(updateLobbyCount, 2000);
 }
 
@@ -138,7 +131,7 @@ async function startGame() {
     await tx.wait();
     clearInterval(pollInterval);
     showScreen("game-screen");
-    buildCityGrid();
+    buildMap();
     startHostGameLoop();
   } catch (e) {
     console.error(e);
@@ -152,13 +145,8 @@ async function startGame() {
 async function setupPlayer() {
   document.getElementById("join-status").textContent = "Setting up wallet...";
 
-  // Create or load burner wallet
   let privateKey = new URLSearchParams(window.location.search).get("pk");
-
-  if (!privateKey) {
-    privateKey = localStorage.getItem("blocs_burner_pk");
-  }
-
+  if (!privateKey) privateKey = localStorage.getItem("blocs_burner_pk");
   if (!privateKey) {
     const fresh = ethers.Wallet.createRandom();
     privateKey = fresh.privateKey;
@@ -170,29 +158,23 @@ async function setupPlayer() {
   signer = burnerWallet;
   contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
 
-  // Fund burner via Vercel serverless function
   await fundBurnerIfNeeded(burnerWallet.address);
 
   document.getElementById("join-status").textContent = "Joining game...";
 
   try {
-    // Check if already registered
     const playerData = await contract.players(burnerWallet.address);
     if (!playerData.registered) {
       const tx = await contract.join();
       await tx.wait();
     }
 
-    const cityId = await getPlayerCity(burnerWallet.address);
-    myCity = cityId;
-
+    myCity = await getPlayerCity(burnerWallet.address);
     document.getElementById("join-status").textContent = "✅ Joined!";
     document.getElementById("player-city-display").textContent =
-      `Your starting city: #${cityId + 1}`;
+      myCity !== null ? `Your starting city: #${myCity + 1}` : "";
 
-    // Wait for game to start
     pollInterval = setInterval(checkGameStart, 2000);
-
   } catch (e) {
     console.error(e);
     document.getElementById("join-status").textContent =
@@ -210,86 +192,152 @@ async function getPlayerCity(address) {
 
 async function checkGameStart() {
   try {
-    const phase = await contract.getPhase();
-    if (Number(phase) === 1) {
+    const phase = Number(await contract.getPhase());
+    if (phase === 1) {
       clearInterval(pollInterval);
       showScreen("game-screen");
-      buildCityGrid();
-      buildCitySelect();
+      buildMap();
+      buildRegionSelect();
       document.getElementById("action-panel").style.display = "flex";
       startPlayerGameLoop();
     }
   } catch (e) {}
 }
 
-// ── CITY GRID ────────────────────────────────────────────────────
-function buildCityGrid() {
+// ── MAP ───────────────────────────────────────────────────────────
+function buildMap() {
   const grid = document.getElementById("city-grid");
-  grid.innerHTML = "";
-  for (let i = 0; i < TOTAL_CITIES; i++) {
-    const cell = document.createElement("div");
-    cell.className = "city-cell";
-    cell.id = `city-${i}`;
-    cell.textContent = `C${i + 1}`;
-    grid.appendChild(cell);
+  grid.innerHTML = `
+  <svg id="world-svg" viewBox="0 0 1000 500"
+    style="width:100%;height:auto;background:#0d1117;border-radius:12px;">
+
+    <!-- North America -->
+    <path id="region-NA"
+      d="M80,80 L200,60 L240,100 L220,180 L180,220 L120,200 L80,160 Z"
+      fill="#1a1a2e" stroke="#444" stroke-width="1.5" class="region"
+      onclick="selectRegion('NA')"/>
+    <text x="155" y="145" fill="#666" font-size="12"
+      text-anchor="middle" pointer-events="none">N.AMERICA</text>
+
+    <!-- South America -->
+    <path id="region-SA"
+      d="M160,240 L220,230 L245,300 L225,385 L185,405 L145,365 L132,292 Z"
+      fill="#1a1a2e" stroke="#444" stroke-width="1.5" class="region"
+      onclick="selectRegion('SA')"/>
+    <text x="188" y="322" fill="#666" font-size="12"
+      text-anchor="middle" pointer-events="none">S.AMERICA</text>
+
+    <!-- Europe -->
+    <path id="region-EU"
+      d="M415,55 L505,45 L525,105 L505,145 L440,155 L408,112 Z"
+      fill="#1a1a2e" stroke="#444" stroke-width="1.5" class="region"
+      onclick="selectRegion('EU')"/>
+    <text x="466" y="105" fill="#666" font-size="12"
+      text-anchor="middle" pointer-events="none">EUROPE</text>
+
+    <!-- Africa -->
+    <path id="region-AF"
+      d="M415,172 L502,162 L524,224 L514,325 L462,362 L408,324 L398,242 Z"
+      fill="#1a1a2e" stroke="#444" stroke-width="1.5" class="region"
+      onclick="selectRegion('AF')"/>
+    <text x="460" y="268" fill="#666" font-size="12"
+      text-anchor="middle" pointer-events="none">AFRICA</text>
+
+    <!-- Asia -->
+    <path id="region-AS"
+      d="M542,48 L782,38 L804,122 L762,184 L682,202 L582,182 L532,132 Z"
+      fill="#1a1a2e" stroke="#444" stroke-width="1.5" class="region"
+      onclick="selectRegion('AS')"/>
+    <text x="660" y="122" fill="#666" font-size="12"
+      text-anchor="middle" pointer-events="none">ASIA</text>
+
+    <!-- Oceania -->
+    <path id="region-OC"
+      d="M722,282 L822,272 L842,342 L802,382 L722,372 L702,322 Z"
+      fill="#1a1a2e" stroke="#444" stroke-width="1.5" class="region"
+      onclick="selectRegion('OC')"/>
+    <text x="772" y="332" fill="#666" font-size="12"
+      text-anchor="middle" pointer-events="none">OCEANIA</text>
+
+  </svg>`;
+}
+
+function selectRegion(code) {
+  if (!isPlayer) return;
+  const region = REGION_MAP[code];
+  if (!region) return;
+  selectedCityIdx = region.cityStart;
+  document.getElementById("action-status").textContent =
+    `Targeting: ${region.label}`;
+
+  // Highlight selected region
+  document.querySelectorAll(".region").forEach(r => {
+    r.setAttribute("stroke", "#444");
+    r.setAttribute("stroke-width", "1.5");
+  });
+  const path = document.getElementById(`region-${code}`);
+  if (path) {
+    path.setAttribute("stroke", "#ffffff");
+    path.setAttribute("stroke-width", "3");
   }
 }
 
-function buildCitySelect() {
-  const select = document.getElementById("city-select");
-  select.innerHTML = "";
-  for (let i = 0; i < TOTAL_CITIES; i++) {
-    const opt = document.createElement("option");
-    opt.value = i;
-    opt.textContent = `City ${i + 1}`;
-    select.appendChild(opt);
-  }
+function buildRegionSelect() {
+  // Region select is handled by tapping the SVG map directly
+  // Default target is North America
+  selectedCityIdx = 0;
+  document.getElementById("action-status").textContent =
+    "Tap a continent to target it";
 }
 
-// ── MAP UPDATE ───────────────────────────────────────────────────
+// ── MAP REFRESH ───────────────────────────────────────────────────
 async function refreshMap() {
   try {
     const playerCount = Number(await contract.playerCount());
 
-    // Build address → color map
     for (let i = 0; i < playerCount; i++) {
       const addr = await contract.playerList(i);
-      if (!playerAddressMap[addr]) {
+      if (playerAddressMap[addr] === undefined) {
         playerAddressMap[addr] = i;
       }
     }
 
-    // Update city cells
-    for (let i = 0; i < TOTAL_CITIES; i++) {
-      const owner = await contract.getCityOwner(i);
-      const cell = document.getElementById(`city-${i}`);
-      if (!cell) continue;
-
-      if (owner === ethers.ZeroAddress) {
-        cell.style.background = "#1a1a2e";
-        cell.style.borderColor = "#333";
-        cell.style.borderWidth = "2px";
-      } else {
-        const colorIdx = playerAddressMap[owner] ?? 0;
-        const color = COLORS[colorIdx % COLORS.length];
-        cell.style.background = color;
-        cell.style.borderColor = color;
-
-        // Highlight your own cities
-        if (
-          isPlayer &&
-          burnerWallet &&
-          owner.toLowerCase() === burnerWallet.address.toLowerCase()
-        ) {
-          cell.style.borderColor = "#ffffff";
-          cell.style.borderWidth = "3px";
+    // Tally dominant owner per region
+    const regionOwners = {};
+    for (const [code, region] of Object.entries(REGION_MAP)) {
+      const tally = {};
+      for (let i = region.cityStart; i < region.cityStart + 5; i++) {
+        const owner = await contract.getCityOwner(i);
+        if (owner !== ethers.ZeroAddress) {
+          tally[owner] = (tally[owner] || 0) + 1;
         }
+      }
+      const dominant = Object.entries(tally).sort((a, b) => b[1] - a[1])[0];
+      if (dominant) regionOwners[code] = dominant[0];
+    }
+
+    // Paint regions
+    for (const [code, owner] of Object.entries(regionOwners)) {
+      const path = document.getElementById(`region-${code}`);
+      if (!path) continue;
+      const colorIdx = playerAddressMap[owner] ?? 0;
+      const color = COLORS[colorIdx % COLORS.length];
+      path.setAttribute("fill", color);
+
+      if (
+        isPlayer &&
+        burnerWallet &&
+        owner.toLowerCase() === burnerWallet.address.toLowerCase()
+      ) {
+        path.setAttribute("stroke", "#ffffff");
+        path.setAttribute("stroke-width", "3");
+      } else {
+        path.setAttribute("stroke", "#444");
+        path.setAttribute("stroke-width", "1.5");
       }
     }
 
-    // Update leaderboard
     await refreshLeaderboard(playerCount);
-
   } catch (e) {
     console.error("Map refresh error:", e);
   }
@@ -377,9 +425,7 @@ async function startPlayerGameLoop() {
       const round = Number(await contract.currentRound());
       const phase = Number(await contract.getPhase());
 
-      document.getElementById("round-display").textContent =
-        `ROUND ${round}`;
-
+      document.getElementById("round-display").textContent = `ROUND ${round}`;
       await refreshMap();
 
       if (round !== lastRound) {
@@ -387,7 +433,7 @@ async function startPlayerGameLoop() {
         moveSubmitted = false;
         resetActionButtons();
         document.getElementById("action-status").textContent =
-          "Choose your move";
+          "Tap a continent to target it";
       }
 
       if (phase === 2) {
@@ -402,25 +448,25 @@ async function startPlayerGameLoop() {
 async function submitMove(isAttack) {
   if (moveSubmitted) return;
 
-  const targetCity = parseInt(
-    document.getElementById("city-select").value
-  );
-  const statusEl = document.getElementById("move-status");
   const attackBtn = document.querySelector(".btn-attack");
   const fortifyBtn = document.querySelector(".btn-fortify");
+  const statusEl = document.getElementById("move-status");
 
   attackBtn.disabled = true;
   fortifyBtn.disabled = true;
   statusEl.textContent = "Submitting...";
 
   try {
-    const tx = await contract.submitMove(isAttack, targetCity);
+    const tx = await contract.submitMove(isAttack, selectedCityIdx);
     await tx.wait();
     moveSubmitted = true;
+    const regionLabel = Object.values(REGION_MAP).find(
+      r => r.cityStart === selectedCityIdx
+    )?.label ?? `City ${selectedCityIdx + 1}`;
     statusEl.textContent = isAttack
-      ? `⚔️ Attacking City ${targetCity + 1}`
-      : `🛡️ Fortified City ${targetCity + 1}`;
-    document.getElementById("action-status").textContent = "Move locked in ✅";
+      ? `⚔️ Attacking ${regionLabel}`
+      : `🛡️ Fortified ${regionLabel}`;
+    document.getElementById("action-status").textContent = "Move locked ✅";
   } catch (e) {
     console.error(e);
     statusEl.textContent = "❌ Failed — try again";
@@ -440,11 +486,11 @@ function resetActionButtons() {
 
 // ── TIMER ─────────────────────────────────────────────────────────
 function startTimer(duration, onComplete) {
+  if (timerInterval) clearInterval(timerInterval);
+
   const timerBar = document.getElementById("timer-bar");
   const timerDisplay = document.getElementById("timer-display");
   let remaining = duration;
-
-  if (timerInterval) clearInterval(timerInterval);
 
   timerBar.style.width = "100%";
   timerBar.style.background = "#7c3aed";
@@ -453,11 +499,8 @@ function startTimer(duration, onComplete) {
   timerInterval = setInterval(() => {
     remaining--;
     timerDisplay.textContent = remaining;
-    const pct = (remaining / duration) * 100;
-    timerBar.style.width = pct + "%";
-
+    timerBar.style.width = `${(remaining / duration) * 100}%`;
     if (remaining <= 3) timerBar.style.background = "#ef4444";
-
     if (remaining <= 0) {
       clearInterval(timerInterval);
       onComplete();
@@ -475,9 +518,7 @@ async function showWinner() {
     document.getElementById("winner-address").style.color =
       COLORS[colorIdx % COLORS.length];
 
-    const cityCount = Number(
-      await contract.getPlayerCityCount(winnerAddr)
-    );
+    const cityCount = Number(await contract.getPlayerCityCount(winnerAddr));
     document.getElementById("winner-cities").textContent =
       `Controlled ${cityCount} of ${TOTAL_CITIES} cities`;
 
