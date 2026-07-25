@@ -34,15 +34,6 @@ const COLORS = [
   "#9333ea","#db2777","#65a30d","#0284c7","#7c3aed"
 ];
 
-// ── COUNTRY → CITY MAPPING ───────────────────────────────────────
-// 195 countries mapped to 30 cities (6 regions x 5 cities)
-// Region 0: North America (cities 0-4)
-// Region 1: South America (cities 5-9)
-// Region 2: Europe (cities 10-14)
-// Region 3: Africa (cities 15-19)
-// Region 4: Asia (cities 20-24)
-// Region 5: Oceania (cities 25-29)
-
 const COUNTRY_TO_CITY = {
   // North America (0-4)
   "us": 0, "ca": 1, "mx": 2, "gt": 3, "bz": 3, "hn": 3,
@@ -87,11 +78,11 @@ const COUNTRY_TO_CITY = {
   "mm": 22, "kr": 20, "iq": 23, "af": 23, "sa": 23,
   "uz": 24, "my": 22, "ye": 23, "np": 21, "kp": 20,
   "tw": 20, "sy": 23, "lk": 21, "kz": 24, "kh": 22,
-  "jo": 23, "az": 24, "ae": 23, "tj": 24, "la": 22,
-  "il": 23, "lb": 23, "kg": 24, "tm": 24, "sg": 22,
-  "om": 23, "ps": 23, "kw": 23, "ge": 24, "mn": 20,
-  "qa": 23, "bh": 23, "tl": 22, "bn": 22, "bt": 21,
-  "mv": 21, "am": 24, "mo": 20, "hk": 20,
+  "jo": 23, "ae": 23, "tj": 24, "la": 22, "il": 23,
+  "lb": 23, "kg": 24, "tm": 24, "sg": 22, "om": 23,
+  "ps": 23, "kw": 23, "mn": 20, "qa": 23, "bh": 23,
+  "tl": 22, "bn": 22, "bt": 21, "mv": 21, "mo": 20,
+  "hk": 20,
 
   // Oceania (25-29)
   "au": 25, "pg": 26, "nz": 27, "fj": 28, "sb": 26,
@@ -146,14 +137,6 @@ async function fundBurnerIfNeeded(address) {
   }
 }
 
-    // Proceed anyway after timeout
-    console.warn("Funding timeout — proceeding anyway");
-
-  } catch (e) {
-    console.error("Funding failed:", e);
-  }
-}
-
 // ── HOST SETUP ───────────────────────────────────────────────────
 async function setupHost() {
   provider = new ethers.JsonRpcProvider(RPC_URL);
@@ -171,7 +154,6 @@ async function setupHost() {
 
   await fundBurnerIfNeeded(burnerWallet.address);
 
-  // Check if game already active — skip to game screen
   const phase = Number(await contract.getPhase());
   if (phase === 1) {
     clearInterval(pollInterval);
@@ -239,14 +221,13 @@ async function setupPlayer() {
 
   await fundBurnerIfNeeded(burnerWallet.address);
 
-  // Check if game already active — skip join
   const phase = Number(await contract.getPhase());
   if (phase === 1) {
-    statusEl.textContent = "Game in progress — joining...";
+    statusEl.textContent = "Game in progress...";
     try {
       const playerData = await contract.players(burnerWallet.address);
       if (!playerData.registered) {
-        statusEl.textContent = "❌ Game already started. Wait for next round.";
+        statusEl.textContent = "❌ Game already started. Wait for next game.";
         return;
       }
       myCity = await getPlayerCity(burnerWallet.address);
@@ -270,7 +251,7 @@ async function setupPlayer() {
     }
 
     myCity = await getPlayerCity(burnerWallet.address);
-    statusEl.textContent = "✅ Joined! Waiting for host to start...";
+    statusEl.textContent = "✅ Joined! Waiting for host...";
     document.getElementById("player-city-display").textContent =
       myCity !== null ? `Your starting city: #${myCity + 1}` : "";
 
@@ -305,7 +286,8 @@ async function checkGameStart() {
 // ── MAP ───────────────────────────────────────────────────────────
 async function buildMap() {
   const grid = document.getElementById("city-grid");
-  grid.innerHTML = `<p style="color:#666;text-align:center;padding:20px;">Loading map...</p>`;
+  grid.innerHTML = `<p style="color:#666;text-align:center;padding:20px;">
+    Loading map...</p>`;
 
   try {
     const res = await fetch(
@@ -313,7 +295,6 @@ async function buildMap() {
     );
     const geojson = await res.json();
 
-    // Build SVG using simple projection
     const svgNS = "http://www.w3.org/2000/svg";
     const svg = document.createElementNS(svgNS, "svg");
     svg.setAttribute("viewBox", "0 0 1000 500");
@@ -365,11 +346,10 @@ async function buildMap() {
   } catch (e) {
     console.error("Map load error:", e);
     grid.innerHTML = `<p style="color:#ef4444;text-align:center;">
-      Map failed to load. Check connection.</p>`;
+      Map failed to load.</p>`;
   }
 }
 
-// Simple equirectangular projection
 function project(lon, lat) {
   const x = (lon + 180) * (1000 / 360);
   const y = (90 - lat) * (500 / 180);
@@ -382,7 +362,8 @@ function geoToPaths(geometry) {
   const processRing = (coords) => {
     if (!coords || coords.length === 0) return null;
     const points = coords.map(([lon, lat]) => project(lon, lat));
-    return "M" + points.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join("L") + "Z";
+    return "M" + points.map(([x, y]) =>
+      `${x.toFixed(1)},${y.toFixed(1)}`).join("L") + "Z";
   };
 
   if (geometry.type === "Polygon") {
@@ -401,13 +382,11 @@ function selectCountry(code, name, cityIdx) {
   selectedCityIdx = cityIdx;
   selectedCountryName = name;
 
-  // Reset all strokes
   document.querySelectorAll("[data-code]").forEach(p => {
     p.setAttribute("stroke", "#2a2a4a");
     p.setAttribute("stroke-width", "0.5");
   });
 
-  // Highlight selected country and neighbors (same city)
   document.querySelectorAll(`[data-city="${cityIdx}"]`).forEach(p => {
     p.setAttribute("stroke", "#ffffff");
     p.setAttribute("stroke-width", "1.5");
@@ -429,15 +408,13 @@ async function refreshMap() {
       }
     }
 
-    // Fetch all city owners
     for (let i = 0; i < TOTAL_CITIES; i++) {
       cityOwnerCache[i] = await contract.getCityOwner(i);
     }
 
-    // Paint every country path
     document.querySelectorAll("[data-code]").forEach(path => {
       const cityIdx = parseInt(path.getAttribute("data-city"));
-      if (cityIdx < 0 || cityIdx === undefined) return;
+      if (isNaN(cityIdx) || cityIdx < 0) return;
 
       const owner = cityOwnerCache[cityIdx];
       if (!owner || owner === ethers.ZeroAddress) {
